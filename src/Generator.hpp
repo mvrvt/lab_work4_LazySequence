@@ -1,38 +1,41 @@
 #pragma once
 
 #include <stdexcept>
-#include "lab2_files/DynamicArray.hpp"
+#include "MyUtils.hpp"
 
-// Forward declaration 
-class LazySequence;
-
+// Интерфейс для всех генераторов 
 template <typename T>
-class Generator {
+class IGenerator {
 public:
-    // Определение типа "указатель на функцию", который принимает кэш и возвращает новый элемент
-    typedef T ( *RuleFunc ) ( const DynamicArray<T>& );
+    virtual ~IGenerator() = default; 
 
-    Generator( LazySequence<T>* owner, RuleFunc rule ) 
-        : owner_( owner ), rule_( rule ) {
-            if ( !rule )
-                throw std::invalid_argument( "Generator: Rule function pointer can't be null" );
-    }
-    
-    // Метод порождения очередного элемента
-    T GetNext() {
-        if ( !owner_ ) {
-            throw std::runtime_error( "Generator: owner is null" ); 
-        }
-        // Вызов функции-правила, передавая ей уже вычисленные элементы (кэш хозяина)
-        return rule_( owner_->GetCache() );
+    // Возвращает Optional: если есть значение - возвращает его, если конец - пустой Optional
+    virtual my_utils::Optional<T> TryGetNext() = 0;
+
+    virtual bool HasNext() const = 0;
+};
+
+// Базовый генератор на основе правила (функции)
+template <typename T>
+class RuleGenerator : public IGenerator<T> {
+public:
+    // Функция не требует знания о кэше самого списка, 
+    // она просто вычисляет след. значение на основе своего состояния
+    typedef my_utils::Optional<T> ( *RuleFunc )();
+
+    explicit RuleGenerator( RuleFunc rule ) : rule_( rule ) {
+        if ( !rule_ ) 
+            throw std::invalid_argument( "RuleGenerator: rule function can't be null" );
     }
 
-    // Для бесконечных последовательностей всегда возвращаем true 
-    bool HasNext() const {
-        return true;
+    my_utils::Optional<T> TryGetNext() override {
+        return rule_();
+    }
+
+    bool HasNext() const override {
+        return true; // пока считаем бесконечным - true
     }
 
 private:
-    LazySequence<T>* owner_;
     RuleFunc rule_;
 };
