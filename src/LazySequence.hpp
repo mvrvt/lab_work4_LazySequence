@@ -1,6 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <stdexcept>
+#include <cstddef>
+#include <algorithm>
 #include "lab2_files/Sequence.hpp"
 #include "lab2_files/ArraySequence.hpp"
 #include "Generator.hpp"
@@ -34,17 +37,43 @@ public:
 
 private:
     const Sequence<T>* seq_;
-    int   current_index_;
+    int                current_index_;
 };
 
+// -------------------------------------------------------
 template <typename T>
 class LazySequence : public Sequence<T> {
 public:
-    explicit LazySequence( IGenerator<T>* generator ) : generator_( generator ), is_exhausted_( false ) {
-        if ( !generator ) 
-            throw std::invalid_argument( "LazySequence: can't be null" );
-        
-        cache_ = new MutableArraySequence<T>();
+    // ==== Constructors etc.  ====
+
+    LazySequence() : generator_( new EmptyGenerator<T>() ), is_exhausted_( true ) {
+        cache_ = new MutableArraySequence<T>( items, count );
+    }
+
+    LazySequence( T* items, int count ) : generator_( new EmptyGenerator() ), is_exhausted_( true ) {
+        cache_ = new MutableArraySequence<T>( items, count );
+    }
+
+    explicit LazySequence( Sequence<T>* seq ) : generator_( new EmptyGenerator<T>() ), is_exhausted_( true ) {
+        cache_ = seq->Clone();
+    }
+
+    // Задание (рекуррентого) правила через сырой указатель на функцию
+    LazySequence( T ( *rule )( const Sequence<T>* ), Sequence<T>* initial_cache ) : is_exhausted_( false ) {
+        cache_ = initial_cache ? initial_cache : new MutableArraySequence<T>();
+        generator_ = new RuleGenerator<T>( rule, cache_ );
+    }
+
+    // Задание (рекуррентного) правила через std::function
+    LazySequence( std::function<T( const Sequence<T>* )> rule, Sequence<T>* initial_cache ) : is_exhausted_( false ) {
+        cache_ = initial_cache ? initial_cache : new MutableArraySequence<T>();
+        generator_ = new RuleGenerator<T>( rule, cache_ );
+    }
+
+    LazySequence( const LazySequence<T>& other ) : is_exhausted_( other.is_exhausted_ ) {
+        // Глубокое копирование кэша и генератора через полиморфные вызовы
+        cache_ = other.cache_->Clone();
+        generator_ = other.generator_->Clone();
     }
 
     ~LazySequence() override {
@@ -52,28 +81,29 @@ public:
         delete cache_;
     }
 
-    // --- ICollection / IEnumerable ---
+    // ==== Декомпозиция и ICollection (с IEnumerator) ====
 
     IEnumerator<T>* GetEnumerator() const override {
         return new LazyEnumerator<T>( this );
     }
 
-    std::size_t GetCount() const override {
-        MaterializeAll();
-        return cache_->GetCount();
+    T& GetFirst() const override {
+        return const_cast<T&>( Get(0) );
     }
 
-    // --- Декомпозиция ---
+    T& GetLast() const override {
+        MaterializeAll();
+        if (cache_->GetLength() == 0) throw IndexOutOfRange("LazySequence: sequence is empty");
+        return cache_->Get(cache_->GetLength() - 1);
+    }
 
     const T& Get( std::size_t index ) const override {
         int idx = static_cast<int>( index );
-        if ( idx < 0 )
-            throw IndexOutOfRange( "LazySequence: index can't be negative" );
+        if ( idx < 0 ) throw IndexOutOfRange( "LazySequence: index can't be negative" );
         
         MaterializeUpTo( idx );
         
-        if ( idx >= cache_->GetLength() )
-            throw IndexOutOfRange( "LazySequence: index out of range (sequence ended)" );
+        if ( idx >= cache_->GetLength() ) throw IndexOutOfRange( "LazySequence: index out of range (sequence ended)" );
         
         // Возвращаем из кэша
         return cache_->Get( idx );
@@ -84,64 +114,106 @@ public:
         return const_cast<T&>( static_cast<const LazySequence<T>*>( this )->Get( index ) );
     }
 
-    T& GetFirst() const override {
-        return const_cast<T&>( Get(0) );
-    }
-
-    T& GetLast() const override {
-        MaterializeAll();
-        if (cache_->GetLength() == 0) {
-            throw IndexOutOfRange("LazySequence: sequence is empty");
-        }
-        return cache_->Get(cache_->GetLength() - 1);
-    }
-
     int GetLength() const override {
         MaterializeAll();
         return cache_->GetLength();
     }
 
-    Sequence<T>* GetSubsequence(int start, int end) const override {
-        if (start < 0 || end < start) {
-            throw IndexOutOfRange("LazySequence: invalid indices for subsequence");
-        }
-        MaterializeUpTo(end);
-        return cache_->GetSubsequence(start, end);
+    std::size_t GetCount() const override {
+        return static_cast<std::size_t>( GetLenght() );
     }
 
-    // --- Операции (пока делаем заглушки или базовую реализацию) ---
+    // Получить кол-во материализованных эл-ов
+    std::size_t GetMaterializedCount() const {
+        return static_cast<std::size_t>( cache_->GetLength() );
+    }
+
+    LazySequence<T>* GetSubsequence( int startIndex, int endIndex ) const override {
+        if ( startIndex < 0 || endIndex < startIndex ) throw std::out_of_range( "IndexOutOfRange" );
+        MaterializeToUp( endIndex );
+
+        // Создаём новую конечную ленивую пос-ть из вычисленного куска
+        Sequence<T>* sub_cache = cache_->GetSubsequence( startIndex, endIndex );
+        return new LazySequence<T>( sub_cache );
+    }
+
+    // ==== Операции мутации (возвращают новые объекты ) ====
 
     Sequence<T>* CreateEmpty() const override {
-        // Возвращаем пустой массив, так как ленивый пустой список не имеет смысла
-        return new MutableArraySequence<T>();
+        return new LazySequence<T>();
     }
 
-    Sequence<T>* Append(const T& item) override {
-        // По правилам ленивых списков[cite: 33], мы должны создать новый генератор (ConcatGenerator)
-        // Для простоты на данном этапе материализуем, позже напишем ConcatGenerator
+    Sequence<T>* Append( const T& item ) override {
         MaterializeAll();
-        return cache_->Append(item);
+        Sequence<T>* new_cache = cache_->Append( item );
+        return new LazySequence<T>( new_cache );
     }
 
-    Sequence<T>* Prepend(const T& item) override {
+    Sequence<T>* Prepend( const T& item ) override {
         MaterializeAll();
-        return cache_->Prepend(item);
+        Sequence<T>* new_cache = cache_->Prepend( item );
+        return new LazySequence<T>( new_cache );
     }
 
-    Sequence<T>* InsertAt(const T& item, int index) override {
+    // Вставить эл-нт в заданную позицию 
+    LazySequence<T>* InsertAt( const T& item, int index ) override {
         MaterializeAll();
-        return cache_->InsertAt(item, index);
+        Sequence<T>* new_cache = cache_->InsertAt( item, index );
+        return new LazySequence<T>( new_cache );
     }
 
-    Sequence<T>* Concat(Sequence<T>* other) const override {
+    // Сцепляет 2 списка
+    LazySequence<T>* Concat( Sequence<T>* other ) const override {
         MaterializeAll();
-        return cache_->Concat(other);
+        Sequence<T>* new_cache = cache_->Concat( other );
+        return new LazySequence<T>( new_cache );
     }
 
-    // --- Специфичные методы ленивой последовательности ---
+    // Сцепляет два списка (перегрузка специально для LazySequence) 
+    LazySequence<T>* Concat( LazySequence<T>* list ) const {
+        return Concat( static_cast<Sequence<T>*>( list ) );
+    }
 
-    std::size_t GetMaterializedCount() const {
-        return static_cast<std::size_t>(cache_->GetLength());
+    // ==== Функциональные операции (Map(), Reduce(), Where(), Zip()) ====
+
+    template <typename T2>
+    LazySequence<T2>* Map( T2 ( *func )( T ) ) const {
+        MaterializeAll();
+        LazySequence<T2>* result = new LazySequence<T2>();
+        for ( int i = 0; i < cache_->GetLength(); ++i ) 
+            result = static_cast<LazySequence<T2>*>( result->Append( func( cache_->Get( i ) ) ) );
+        return result; 
+    }
+
+    T Reduce( T ( * func )( T, T ), T initial ) const {
+        MaterializeAll();
+        T result = initial;
+        for ( int i = 0; i < cache_->GetLength(); ++i )
+            result = func( result, cache_->Get( i ) );
+        return result;
+    }
+
+    LazySequence<T>* Where( bool ( *predicate )( T ) ) const {
+        MaterializeAll();
+        LazySequence<T>* result = new LazySequence<T>();
+        for ( int i = 0; i < cache_->GetLength(); ++i ) {
+            if ( predicate( cache_->Get( i ) ) ) 
+                result = static_cast<LazySequence<T>*>( result->Append( cache_->Get( i ) ) );
+        }
+        return result;
+    }
+
+    template <typename T2>
+    LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
+        MaterializeAll();
+        LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
+        int min_len = std::min( cache_->GetLenght(), seq->GetLength() );
+
+        for ( int i = 0; i < min_len; ++i ) {
+            my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );
+            result = static_cast<LazySequence<my_utils::Pair<T, T2>>*>( result->Append( pair ) );
+        }
+        return result;
     }
 
 protected:

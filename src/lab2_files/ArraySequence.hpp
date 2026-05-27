@@ -177,6 +177,10 @@ public:
     MutableArraySequence( T* data, int count ) : ArraySequence<T>( data, count ) { }
     MutableArraySequence( const ArraySequence<T>& other ) : ArraySequence<T>( other ) { }
 
+    Sequence<T>* Clone() const override {
+        return new MutableArraySequence<T>(*this);
+    }
+
     Sequence<T>* CreateEmpty() const override {
         return new MutableArraySequence<T>();
     }
@@ -196,6 +200,10 @@ public:
     ImmutableArraySequence() : ArraySequence<T>() { }
     ImmutableArraySequence( T* data, int count ) : ArraySequence<T>( data, count ) { }
     ImmutableArraySequence( const ArraySequence<T>& other ) : ArraySequence<T>( other ) { }
+
+    Sequence<T>* Clone() const override {
+        return new ImmutableArraySequence<T>(*this);
+    }
 
     Sequence<T>* CreateEmpty() const override {
         return new ImmutableArraySequence<T>();

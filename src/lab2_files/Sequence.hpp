@@ -49,6 +49,8 @@ public:
     virtual Sequence<T>* InsertAt( const T& item, int index )       = 0;
     virtual Sequence<T>* Concat( Sequence<T>* other)          const = 0;
 
+    virtual Sequence<T>* Clone() const = 0;
+
     // Фабричный метод
     virtual Sequence<T>* CreateEmpty() const = 0;
 
