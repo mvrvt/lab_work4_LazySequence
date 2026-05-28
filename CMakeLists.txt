@@ -1,16 +1,14 @@
-cmake_minimum_required( VERSION 3.10 )
-project( Lab4_FSM )
+cmake_minimum_required(VERSION 3.10)
+project(Lab4_FSM)
 
-set( CMAKE_CXX_STANDARD 17 )
-set( CMAKE_CXX_STANDARD_REQUIRED ON )
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable( Lab4_FSM
-    main.cpp    
-    src/Generator.hpp
-    src/InputStream.hpp
-    src/FSM.hpp
-    src/LazySequence
-)
+# Указываем компилятору, где лежат наши .hpp файлы
+include_directories(src src/lab2_files)
 
-# Указание компилятору искать заголовочные файлы в папке src
-target_include_directories( Lab4_FSM PRIVATE src )
+# Основная программа
+add_executable(app_main main.cpp)
+
+# Программа для модульных тестов
+#add_executable(app_tests tests/test_main.cpp)

@@ -20,8 +20,8 @@ public:
     }
 
     // IEnumerator
-    IEnumerator<T>* GetEnumerator() override {
-        return new SequenceIterator<T>( this );
+    IEnumerator<T>* GetEnumerator() const override {
+        return new SequenceIterator<T>( const_cast<ArraySequence<T>*>( this ) );
     }
 
     // Декомпозиция

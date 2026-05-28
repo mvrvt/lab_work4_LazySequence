@@ -26,9 +26,9 @@ public:
         }
     }
 
-    T& Current() override {
+    const T& Current() const override {
         // Константный каст нужен, поскольку IEnumerator требует T&
-        return const_cast<T&>( seq_->Get( current_index_ ) );
+        return seq_->Get( current_index_ );
     }
 
     void Reset() override {
@@ -135,6 +135,10 @@ public:
         // Создаём новую конечную ленивую пос-ть из вычисленного куска
         Sequence<T>* sub_cache = cache_->GetSubsequence( startIndex, endIndex );
         return new LazySequence<T>( sub_cache );
+    }
+
+    Sequence<T>* Clone() const override {
+        return new LazySequence<T>( *this );
     }
 
     // ==== Операции мутации (возвращают новые объекты ) ====

@@ -16,8 +16,8 @@ public:
     ~Sequence() override = default;
 
     // ICollection
-    T& Get( std::size_t index )               override = 0;
-    virtual const T& Get( std::size_t index ) const    = 0;
+    T& Get( std::size_t index )             override = 0;
+    const T& Get( std::size_t index ) const override = 0;
     std::size_t GetCount() const override {
         return static_cast<std::size_t>(GetLength());
     }
@@ -49,6 +49,7 @@ public:
     virtual Sequence<T>* InsertAt( const T& item, int index )       = 0;
     virtual Sequence<T>* Concat( Sequence<T>* other)          const = 0;
 
+    // Полиморфное клонирование (добавь эту строку!)
     virtual Sequence<T>* Clone() const = 0;
 
     // Фабричный метод

@@ -13,7 +13,7 @@ public:
         return index_ < seq_->GetLength();
     }
 
-    T& Current() override {
+    const T& Current() const override {
         if ( index_ < 0 || index_ >= seq_->GetLength() )
             throw IndexOutOfRange( "SequenceIterator: index out of range" );
         return seq_->Get( index_ );
