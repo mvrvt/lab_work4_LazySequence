@@ -40,7 +40,8 @@ private:
     int                current_index_;
 };
 
-// -------------------------------------------------------
+// ------------------------------------------------------------------
+
 template <typename T>
 class LazySequence : public Sequence<T> {
 public:

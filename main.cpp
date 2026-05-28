@@ -1,100 +1,121 @@
 #include <iostream>
 #include <string>
-#include <cctype>
 
 #include "src/lab2_files/ArraySequence.hpp"
 #include "src/LazySequence.hpp"
 #include "src/Stream.hpp"
 #include "src/StateMachine.hpp"
 
-using namespace std;
+int ReadInt(int min, int max) {
+    int value;
+    std::cin >> value;
 
+    // Пока ввод некорректен (ввели букву) или число выходит за границы
+    while (std::cin.fail() || value < min || value > max) {
+        std::cin.clear(); // Сбрасываем флаг ошибки cin
+        std::cin.ignore(32767, '\n'); // Очищаем буфер ввода до конца строки
+        std::cout << "Ошибка! Введите корректное число от " << min << " до " << max << ": ";
+        std::cin >> value;
+    }
+}
+
+// === Функции-условия для автомата ===
+
+// Проверка: является ли символ допустимым для имени ящика (буквы, цифры, дефис, подчеркивание)
+bool IsValidNameChar(const char& c) {
+    bool isLower = (c >= 'a' && c <= 'z');
+    bool isUpper = (c >= 'A' && c <= 'Z');
+    bool isDigit = (c >= '0' && c <= '9');
+    bool isSpecial = (c == '_' || c == '-');
+    
+    return isLower || isUpper || isDigit || isSpecial;
+}
+
+// Проверка: является ли символ только буквой (для домена верхнего уровня, типа .com, .ru)
+bool IsLetter(const char& c) {
+    bool isLower = (c >= 'a' && c <= 'z');
+    bool isUpper = (c >= 'A' && c <= 'Z');
+    
+    return isLower || isUpper;
+}
+
+// Проверка: является ли символ собачкой '@'
+bool IsAtSymbol(const char& c) {
+    return c == '@';
+}
+
+// Проверка: является ли символ точкой '.'
+bool IsDotSymbol(const char& c) {
+    return c == '.';
+}
 
 // Настройка автомата (FSM) для Email
-void SetupEmailFSM( fsm::StateMachine<char>& machine ) {
-    // 1. Создание состояний
-    machine.AddState( "START",   false );
-    machine.AddState( "NAME",    false );
-    machine.AddState( "AT",      false );
-    machine.AddState( "DOMAIN",  false );
-    machine.AddState( "DOT",     false );
-    machine.AddState( "SUCCESS", true  ); // Только это состояние означает валидный Email
+void SetupEmailFSM(fsm::StateMachine<char>& machine) {
+    // 1. Создаем состояния
+    machine.AddState("START", false);
+    machine.AddState("NAME", false);
+    machine.AddState("AT", false);
+    machine.AddState("DOMAIN", false);
+    machine.AddState("DOT", false);
+    machine.AddState("SUCCESS", true); // Только это состояние означает валидный Email
 
     machine.SetInitialState("START");
 
-    // Вспомогательные функции-условия
-    auto is_alnum = [](const char& c) { return std::isalnum(c) || c == '_' || c == '-'; };
-    auto is_alpha = [](const char& c) { return std::isalpha(c); };
-
-    // 2. Настройка переходов (Transitions)
-    // Из START в NAME, если буква или цифра
-    machine.AddTransition("START", "NAME", is_alnum);
-    // Крутимся в NAME, пока идут буквы/цифры/символы
-    machine.AddTransition("NAME", "NAME", is_alnum);
-    // Из NAME в AT, если встретили '@'
-    machine.AddTransition("NAME", "AT", [](const char& c) { return c == '@'; });
+    // 2. Настраиваем переходы, передавая наши простые функции
+    machine.AddTransition("START", "NAME", IsValidNameChar);
+    machine.AddTransition("NAME", "NAME", IsValidNameChar);
+    machine.AddTransition("NAME", "AT", IsAtSymbol);
     
-    // Из AT в DOMAIN
-    machine.AddTransition("AT", "DOMAIN", is_alnum);
-    machine.AddTransition("DOMAIN", "DOMAIN", is_alnum);
-    // Из DOMAIN в DOT при встрече точки '.'
-    machine.AddTransition("DOMAIN", "DOT", [](const char& c) { return c == '.'; });
+    machine.AddTransition("AT", "DOMAIN", IsValidNameChar);
+    machine.AddTransition("DOMAIN", "DOMAIN", IsValidNameChar);
+    machine.AddTransition("DOMAIN", "DOT", IsDotSymbol);
 
-    // Из DOT в SUCCESS (например, 'com', 'ru')
-    machine.AddTransition("DOT", "SUCCESS", is_alpha);
-    // Крутимся в SUCCESS для оставшихся букв домена
-    machine.AddTransition("SUCCESS", "SUCCESS", is_alpha);
+    machine.AddTransition("DOT", "SUCCESS", IsLetter);
+    machine.AddTransition("SUCCESS", "SUCCESS", IsLetter);
 }
 
-// ==========================================
-// ГЛАВНОЕ МЕНЮ (UI)
-// ==========================================
 int main() {
+    // Создаем и настраиваем автомат
     fsm::StateMachine<char> email_validator;
     SetupEmailFSM(email_validator);
 
     int choice = 0;
     while (choice != 2) {
-        cout << endl;
-        cout << "=== Лабораторная работа №4: Машина состояний (FSM) ===" << endl;
-        cout << "    1. Проверить Email-адрес (Ручной ввод)" << endl;
-        cout << "    2. Выход" << endl;
-        cout << "  Выберите действие: ";
+        std::cout << std::endl;
+        std::cout << "==== Лабораторная работа №4: Машина состояний (FSM) ====" << std::endl;
+        std::cout << "  1. Проверить Email-адрес (Ручной ввод)" << std::endl;
+        std::cout << "  2. Выход" << std::endl;
+        std::cout << "Выберите действие: ";
         
-        // Защита от ввода букв вместо цифр
-        if (!(cin >> choice)) {
-            cin.clear();
-            cin.ignore(1000, '\n');
-            continue;
-        }
+        choice = ReadInt( 1, 2 );
 
         if (choice == 1) {
-            cout << "\nВведите Email-адрес для проверки: ";
-            string input;
-            cin >> input;
+            std::cout << "\nВведите Email-адрес для проверки: ";
+            std::string input;
+            std::cin >> input;
 
-            // Оборачиваем строку пользователя в нашу Sequence для автомата
+            // Оборачиваем строку пользователя в Sequence для автомата
             Sequence<char>* char_seq = new MutableArraySequence<char>();
             for (char c : input) {
-                char_seq = char_seq->Append( c );
+                char_seq->Append(c);
             }
 
-            // Запуск автомата 
+            // Запуск автомата
             bool is_valid = email_validator.Process(char_seq);
             
-            cout << "-------------------------------------------------------" << endl;
+            std::cout << "-----------------------------------------------------------" << std::endl;
             if (is_valid) {
-                cout << "  РЕЗУЛЬТАТ: Email '" << input << "' ВАЛИДЕН!" << endl;
+                std::cout << "  РЕЗУЛЬТАТ: Email '" << input << "' ВАЛИДЕН!" << std::endl;
             } else {
-                cout << "  РЕЗУЛЬТАТ: Ошибка! Неверный формат Email." << endl;
-                cout << "  Автомат остановился в состоянии: " << email_validator.GetCurrentState() << endl;
+                std::cout << "  РЕЗУЛЬТАТ: Ошибка! Неверный формат Email." << std::endl;
+                std::cout << "  Автомат остановился в состоянии: " << email_validator.GetCurrentState() << std::endl;
             }
-            cout << "-------------------------------------------------------" << endl;
+            std::cout << "-----------------------------------------------------------" << std::endl;
 
             delete char_seq;
         }
     }
 
-    cout << "Программа завершена. До свидания!" << endl;
+    std::cout << "Программа завершена. До свидания!" << std::endl;
     return 0;
 }
