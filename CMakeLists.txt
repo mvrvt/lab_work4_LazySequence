@@ -11,4 +11,4 @@ include_directories(src src/lab2_files)
 add_executable(app_main main.cpp)
 
 # Программа для модульных тестов
-#add_executable(app_tests tests/test_main.cpp)
+add_executable(app_tests tests/test_main.cpp)
