@@ -93,8 +93,8 @@ public:
 
     T& GetLast() const override {
         MaterializeAll();
-        if (cache_->GetLength() == 0) throw IndexOutOfRange("LazySequence: sequence is empty");
-        return cache_->Get(cache_->GetLength() - 1);
+        if ( cache_->GetLength() == 0 ) throw IndexOutOfRange( "LazySequence: sequence is empty" );
+        return cache_->Get( cache_->GetLength() - 1 );
     }
 
     const T& Get( std::size_t index ) const override {

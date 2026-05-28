@@ -8,7 +8,7 @@
 #include "lab2_files/ArraySequence.hpp"
 #include "MyUtils.hpp"
 
-// Просторанство имён для автомата, чтобы отделить логику FSM
+// Просторанство имён для автомата, чтобы отделить логику FSM (Finite State Machine)
 namespace fsm {
     
 // Структура, описывающая состояние автомата
@@ -25,7 +25,7 @@ class Transition {
 public:
     using PredicateFunc = std::function<bool( const T& )>;
 
-    // ДОБАВЛЯЕМ КОНСТРУКТОР ПО УМОЛЧАНИЮ (C++ требует его для массивов)
+    // Нужен для массивов
     Transition() : from_state(""), to_state(""), condition_(nullptr) { }
 
     Transition( const std::string& from, const std::string& to, PredicateFunc condition )
@@ -118,8 +118,8 @@ private:
     MutableArraySequence<std::shared_ptr<State>> states_;
     MutableArraySequence<Transition<T>>          transitions_;
 
-    std::string initial_state_id_;
-    std::string current_state_id_;
+    std::string                                  initial_state_id_;
+    std::string                                  current_state_id_;
 
     // Вспомогательный метод поиска состояния
     int FindState( const std::string& id ) const {

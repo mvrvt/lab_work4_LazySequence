@@ -19,7 +19,7 @@ public:
     T& Get( std::size_t index )             override = 0;
     const T& Get( std::size_t index ) const override = 0;
     std::size_t GetCount() const override {
-        return static_cast<std::size_t>(GetLength());
+        return static_cast<std::size_t>( GetLength() );
     }
 
     // IEnumerable
