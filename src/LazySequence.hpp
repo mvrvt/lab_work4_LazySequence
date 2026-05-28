@@ -13,7 +13,7 @@
 template <typename T>
 class LazyEnumerator : public IEnumerator<T> {
 public:
-    explicit LazyEnumerator( const Sequence<T>* seq_ ) : seq_( seq ), current_index_( -1 ) { }
+    explicit LazyEnumerator( const Sequence<T>* seq ) : seq_( seq ), current_index_( -1 ) { }
 
     bool MoveNext() override {
         current_index_++;
@@ -47,10 +47,10 @@ public:
     // ==== Constructors etc.  ====
 
     LazySequence() : generator_( new EmptyGenerator<T>() ), is_exhausted_( true ) {
-        cache_ = new MutableArraySequence<T>( items, count );
+        cache_ = new MutableArraySequence<T>();
     }
 
-    LazySequence( T* items, int count ) : generator_( new EmptyGenerator() ), is_exhausted_( true ) {
+    LazySequence( T* items, int count ) : generator_( new EmptyGenerator<T>() ), is_exhausted_( true ) {
         cache_ = new MutableArraySequence<T>( items, count );
     }
 
@@ -120,7 +120,7 @@ public:
     }
 
     std::size_t GetCount() const override {
-        return static_cast<std::size_t>( GetLenght() );
+        return static_cast<std::size_t>( GetLength() );
     }
 
     // Получить кол-во материализованных эл-ов
@@ -130,7 +130,7 @@ public:
 
     LazySequence<T>* GetSubsequence( int startIndex, int endIndex ) const override {
         if ( startIndex < 0 || endIndex < startIndex ) throw std::out_of_range( "IndexOutOfRange" );
-        MaterializeToUp( endIndex );
+        MaterializeUpTo( endIndex );
 
         // Создаём новую конечную ленивую пос-ть из вычисленного куска
         Sequence<T>* sub_cache = cache_->GetSubsequence( startIndex, endIndex );
@@ -207,7 +207,7 @@ public:
     LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
         MaterializeAll();
         LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
-        int min_len = std::min( cache_->GetLenght(), seq->GetLength() );
+        int min_len = std::min( cache_->GetLength(), seq->GetLength() );
 
         for ( int i = 0; i < min_len; ++i ) {
             my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );

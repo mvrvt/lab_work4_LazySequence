@@ -51,14 +51,14 @@ public:
 
     // Добавление нового состояния
     void AddState( const std::string& id, bool is_final = false ) {
-        if ( states_.find( id ) != -1 )
+        if ( FindState( id ) != -1 )
             throw std::invalid_argument( "StateMachine: State already exists" );
         states_.Append( std::make_shared<State>( id, is_final ) );
     }
 
     // Установка начального состояния
     void SetInitialState( const std::string& id ) {
-        if ( states_.find( id ) == -1 )
+        if ( FindState( id ) == -1 )
             throw std::invalid_argument( "StateMachine: State not found" );
         
         initial_state_id_ = id;
@@ -67,7 +67,7 @@ public:
 
     // Добавление правила перехода
     void AddTransition( const std::string& from, const std::string& to, std::function<bool( const T&)> condition ) {
-        if ( states_.find( from ) == -1 || states_.find( to ) == -1 )
+        if ( FindState( from ) == -1 || FindState( to ) == -1 )
             throw std::invalid_argument( "StateMachine: invalid from/to state" );
         transitions_.Append( Transition<T>( from, to, condition ) );
     }
@@ -97,7 +97,7 @@ public:
             // Если для текущего символа нет перехода, автомат останавливается с ошибкой
             if ( !transitioned ) {
                 delete enumerator;
-                retual false;
+                return false;
             }
         }
 
@@ -113,20 +113,20 @@ public:
 
 private:
     MutableArraySequence<std::shared_ptr<State>> states_;
-    MutableArraySequence<Transition<T>>          transition_;
+    MutableArraySequence<Transition<T>>          transitions_;
 
     std::string initial_state_id_;
     std::string current_state_id_;
 
     // Вспомогательный метод поиска состояния
-    int states_.find( const std::string& id ) const {
+    int FindState( const std::string& id ) const {
         for ( int i = 0; i < states_.GetLength(); ++i ) 
             if ( states_.Get( i )->id == id ) return i;
         return -1;
     }
 
     bool IsInFinalState() const {
-        int idx = states_.find( current_state_id_ );
+        int idx = FindState( current_state_id_ );
         if ( idx != -1 ) 
             return states_.Get( idx )->is_final;
         return false;
