@@ -33,4 +33,24 @@ private:
     bool has_value_;
 };
 
+// Структура для описания мощности (размера) LazySequence 
+struct Cardinality {
+    int infinite_parts;  // Кол-во бесконечных генераторов
+    int finite_elements; // Кол-во обычнях элементов
+
+    Cardinality( int inf = 0, int fin = 0 ) : infinite_parts( inf ), finite_elements( fin ) { }
+
+    bool IsInfinite() const {
+        return infinite_parts > 0;
+    }
+
+    // Перегрузка сложения для конкатенации
+    Cardinality operator+( const Cardinality& other ) const {
+        return Cardinality( 
+            this->infinite_parts + other.infinite_parts,
+            this->finite_elements + other.finite_elements
+        );
+    }
+};
+
 }

@@ -93,6 +93,8 @@ public:
     }
 
     T& GetLast() const override {
+        if ( generator_->GetCardinality().IsInfinite() )
+            throw std::logic_error( "LazySequence: can't get the last element of an infinite sequence" );
         MaterializeAll();
         if ( cache_->GetLength() == 0 ) throw IndexOutOfRange( "LazySequence: sequence is empty" );
         return cache_->Get( cache_->GetLength() - 1 );
@@ -116,6 +118,8 @@ public:
     }
 
     int GetLength() const override {
+        if ( generator_->GetCardinality().IsInfinite() ) 
+            throw std::logic_error( "LazySequence: can't get integer length of an infinite sequence" );
         MaterializeAll();
         return cache_->GetLength();
     }
@@ -127,6 +131,10 @@ public:
     // Получить кол-во материализованных эл-ов
     std::size_t GetMaterializedCount() const {
         return static_cast<std::size_t>( cache_->GetLength() );
+    }
+
+    my_utils::Cardinality GetCardinality() const {
+        return generator_->GetCardinality();
     }
 
     LazySequence<T>* GetSubsequence( int startIndex, int endIndex ) const override {
@@ -142,7 +150,7 @@ public:
         return new LazySequence<T>( *this );
     }
 
-    // ==== Операции мутации (возвращают новые объекты ) ====
+    // ==== Операции мутации (возвращают новые объекты) ====
 
     Sequence<T>* CreateEmpty() const override {
         return new LazySequence<T>();
@@ -174,9 +182,41 @@ public:
         return new LazySequence<T>( new_cache );
     }
 
-    // Сцепляет два списка (перегрузка специально для LazySequence) 
-    LazySequence<T>* Concat( LazySequence<T>* list ) const {
-        return Concat( static_cast<Sequence<T>*>( list ) );
+    LazySequence<T>* Concat( LazySequence<T>* other ) const {
+        if ( !other ) throw std::invalid_argument( "LazySequence: other is null" );
+
+        // создаём ленивый генератор конкатенации
+        IGenerator<T>* concat_gen = new ConcatGenerator<T>( this->generator_, other->generator_ );
+
+        LazySequence<T>* result = new LazySequence<T>();
+        delete result->generator_; // удаляем дефолтный генератор
+        result->generator_ = concat_gen;
+        result->is_exhausted_ = false; 
+
+        return result; 
+    }
+
+    Sequence<T>* Concat( Sequence<T>* other ) const override {
+        if ( !other ) throw std::invalid_argument( "LazySequence: other is null" );
+
+        // Попытка превратить other в LazySequence
+        LazySequence<T>* lazy_other = dynamic_cast<LazySequence<T>*>( other );
+        if ( lazy_other ) {
+            return Concat( lazy_other );
+        }
+
+        // Если other - это обычный конечный массив, то
+        if ( GetCardinality().IsInfinite() ) {
+            throw std::logic_error( "LazySequence: Cannot materialize infinite sequence to concat with plain array" );
+        }
+        
+        MaterializeAll();
+        // Склеиваем кэши
+        Sequence<T>* result_cache = cache_->Concat( other );
+        LazySequence<T>* result = new LazySequence<T>();
+        delete result->cache_;
+        result->cache_ = result_cache;
+        return result;
     }
 
     // ==== Функциональные операции (Map(), Reduce(), Where(), Zip()) ====
