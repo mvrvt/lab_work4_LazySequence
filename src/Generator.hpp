@@ -69,28 +69,13 @@ private:
     int                   generated_count_; // счётчик выданных элементов 
 };
 
-// Генератор-заглушка для конечных/пустых последовательностей 
-template <typename T>
-class EmptyGenerator : public IGenerator<T> {
-public:
-    T GetNext() override { throw std::out_of_range( "EmptyGenerator: no elements" ); }
-    my_utils::Optional<T> TryGetNext() override { return my_utils::Optional<T>(); }
-    bool HasNext()    const override { return false; }
-    IGenerator<T>* Clone() const override {
-        return new EmptyGenerator<T>();
-    }
-    mu_utils::Cardinality GetCardinality() const override {
-        return my_utils::Cardinality( 0, 0 );
-    }
-};
-
 // Композитный генератор для ленивой конкатенации
 template <typename T>
 class ConcatGenerator : public IGenerator<T> {
 public:
-    ConcatGenerator( IGenerator<T<* left, IGenerator<T>* right ) {
-        left_gen_ = left->Clone();
-        right_gen = right->Clone();
+    ConcatGenerator( IGenerator<T>* left, IGenerator<T>* right ) {
+        left_gen_  = left->Clone();
+        right_gen_ = right->Clone();
     } 
 
     ~ConcatGenerator() override {
@@ -129,4 +114,105 @@ public:
 private:
     IGenerator<T>* left_gen_;
     IGenerator<T>* right_gen_;
+};
+
+template <typename T, typename T2>
+class MapGenerator : public IGenerator<T2> {
+public:
+    // Конструктор принимает указатель на исходный генератор и функцию.
+    // Важно: мы берем владение над source_, поэтому в деструкторе его удаляем
+    MapGenerator( IGenerator<T>* source, T2 ( *func )( T ) ) : source_( source ), func_( func ) {}
+
+    ~MapGenerator() override {
+        delete source_;
+    }
+
+    my_utils::Optional<T2> TryGetNext() override {
+        auto val = source_->TryGetNext();
+        if ( val.HasValue() ) {
+            return my_utils::Optional<T2>( func_( val.Value() ) );
+        }
+        return my_utils::Optional<T2>(); // Если источник иссяк
+    }
+
+    T2 GetNext() override {
+        auto val = TryGetNext();
+        if ( !val.HasValue() ) throw std::out_of_range( "MapGenerator: reached end" );
+        return val.Value();
+    }
+
+    bool HasNext() const override {
+        return source_->HasNext();
+    }
+
+    IGenerator<T2>* Clone() const override {
+        // При клонировании обязательно клонируем и внутренний генератор
+        return new MapGenerator<T, T2>( source_->Clone(), func_ );
+    }
+
+    my_utils::Cardinality GetCardinality() const override {
+        return source_->GetCardinality(); // Мощность не меняется
+    }
+
+private:
+    IGenerator<T>* source_;
+    T2             ( *func_ )( T );
+};
+
+template <typename T>
+class WhereGenerator : public IGenerator<T> {
+public:
+    WhereGenerator( IGenerator<T>* source, bool ( *pred )( T ) ) : source_( source ), pred_( pred ) {}
+
+    ~WhereGenerator() override { delete source_; }
+
+    my_utils::Optional<T> TryGetNext() override {
+        // Крутим цикл, пока в источнике есть элементы
+        while ( source_->HasNext() ) {
+            auto val = source_->TryGetNext();
+            if ( val.HasValue() && pred_( val.Value() ) ) {
+                return val; // Нашли подходящий — сразу отдаём
+            }
+        }
+        return my_utils::Optional<T>();
+    }
+
+    T GetNext() override {
+        auto val = TryGetNext();
+        if ( !val.HasValue() ) throw std::out_of_range( "WhereGenerator: reached end" );
+        return val.Value();
+    }
+
+    bool HasNext() const override {
+        // Мы не знаем наверняка, есть ли подходящие элементы дальше,
+        // поэтому опираемся на источник.
+        return source_->HasNext(); 
+    }
+
+    IGenerator<T>* Clone() const override {
+        return new WhereGenerator<T>( source_->Clone(), pred_ );
+    }
+
+    my_utils::Cardinality GetCardinality() const override {
+        return source_->GetCardinality(); 
+    }
+
+private:
+    IGenerator<T>* source_;
+    bool           ( *pred_ )( T );
+};
+
+// Генератор-заглушка для конечных/пустых последовательностей 
+template <typename T>
+class EmptyGenerator : public IGenerator<T> {
+public:
+    T GetNext() override { throw std::out_of_range( "EmptyGenerator: no elements" ); }
+    my_utils::Optional<T> TryGetNext() override { return my_utils::Optional<T>(); }
+    bool HasNext()    const override { return false; }
+    IGenerator<T>* Clone() const override {
+        return new EmptyGenerator<T>();
+    }
+    my_utils::Cardinality GetCardinality() const override {
+        return my_utils::Cardinality( 0, 0 );
+    }
 };

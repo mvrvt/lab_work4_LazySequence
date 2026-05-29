@@ -44,12 +44,17 @@ public:
 
     // ==== Декомпозиция ====
 
-    // Признак того, что достигнут конец потока
     bool IsEndOfStream() const {
         if ( !is_open_ ) throw std::logic_error( "ReadOnlyStream: stream is closed" );
-        // Поскольку GetLength() у LazySequence может вызвать полную материализацию,
-        // для бесконечных потоков это может зависнуть.
-        // В данной ЛР для потоков из кэша сверяемся с длиной
+        
+        // Проверка на то ленивая ли пос-ть
+        const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>( source_sequence_ );
+        
+        // Если это ленивая последовательность и она бесконечна - конец никогда не наступит
+        if ( lazy_seq != nullptr && lazy_seq->GetCardinality().IsInfinite() ) {
+            return false; 
+        }
+
         return current_position_ >= static_cast<size_t>( source_sequence_->GetLength() );
     }
 

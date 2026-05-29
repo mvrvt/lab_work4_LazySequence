@@ -223,49 +223,54 @@ public:
 
     template <typename T2>
     LazySequence<T2>* Map( T2 ( *func )( T ) ) const {
-        MaterializeAll();
-        LazySequence<T2>* result = new LazySequence<T2>();
-        for ( int i = 0; i < cache_->GetLength(); ++i ) 
-            result = static_cast<LazySequence<T2>*>( result->Append( func( cache_->Get( i ) ) ) );
-        return result; 
+        // Берем копию текущего генератора и оборачиваем её в MapGenerator
+        IGenerator<T2>* map_gen = new MapGenerator<T, T2>( generator_->Clone(), func );
+        return new LazySequence<T2>( map_gen );
+    }
+
+    LazySequence<T>* Where( bool ( *predicate )( T ) ) const {
+        IGenerator<T>* where_gen = new WhereGenerator<T>( generator_->Clone(), predicate );
+        return new LazySequence<T>( where_gen );
     }
 
     T Reduce( T ( * func )( T, T ), T initial ) const {
-        MaterializeAll();
+        // Reduce невозможно применить к бесконечности
+        if ( GetCardinality().IsInfinite() ) {
+            throw std::logic_error( "LazySequence: Cannot reduce an infinite sequence!" );
+        }
+        
+        // Здесь полная материализация безопасна, поскольку список точно конечный
+        MaterializeAll(); 
         T result = initial;
         for ( int i = 0; i < cache_->GetLength(); ++i )
             result = func( result, cache_->Get( i ) );
         return result;
     }
 
-    LazySequence<T>* Where( bool ( *predicate )( T ) ) const {
-        MaterializeAll();
-        LazySequence<T>* result = new LazySequence<T>();
-        for ( int i = 0; i < cache_->GetLength(); ++i ) {
-            if ( predicate( cache_->Get( i ) ) ) 
-                result = static_cast<LazySequence<T>*>( result->Append( cache_->Get( i ) ) );
-        }
-        return result;
-    }
+    // template <typename T2>
+    // LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
+    //     MaterializeAll();
+    //     LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
+    //     int min_len = std::min( cache_->GetLength(), seq->GetLength() );
 
-    template <typename T2>
-    LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
-        MaterializeAll();
-        LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
-        int min_len = std::min( cache_->GetLength(), seq->GetLength() );
-
-        for ( int i = 0; i < min_len; ++i ) {
-            my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );
-            result = static_cast<LazySequence<my_utils::Pair<T, T2>>*>( result->Append( pair ) );
-        }
-        return result;
-    }
+    //     for ( int i = 0; i < min_len; ++i ) {
+    //         my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );
+    //         result = static_cast<LazySequence<my_utils::Pair<T, T2>>*>( result->Append( pair ) );
+    //     }
+    //     return result;
+    // }
 
 protected:
     // Поля mutable, чтобы их можно было менять внутри const-методов 
     mutable Sequence<T>*   cache_;
     mutable IGenerator<T>* generator_;
     mutable bool           is_exhausted_;
+
+    // Конструктор специально для методов Map, Where и т.д.
+    explicit LazySequence( IGenerator<T>* generator ) : is_exhausted_( false ) {
+        cache_ = new MutableArraySequence<T>();
+        generator_ = generator;
+    }
 
 private:
     // Приватный метод для вычисления элементов до нужного индекса

@@ -17,6 +17,7 @@ int ReadInt(int min, int max) {
         std::cout << "Ошибка! Введите корректное число от " << min << " до " << max << ": ";
         std::cin >> value;
     }
+    return value;
 }
 
 // === Функции-условия для автомата ===
