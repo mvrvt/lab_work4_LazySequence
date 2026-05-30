@@ -117,7 +117,7 @@ public:
         return const_cast<T&>( static_cast<const LazySequence<T>*>( this )->Get( index ) );
     }
 
-    int GetLength() const override {
+    int GetLength() const override { //TODO: неправильный тип метода 
         if ( generator_->GetCardinality().IsInfinite() ) 
             throw std::logic_error( "LazySequence: can't get integer length of an infinite sequence" );
         MaterializeAll();
@@ -129,13 +129,19 @@ public:
     }
 
     // Получить кол-во материализованных эл-ов
-    std::size_t GetMaterializedCount() const {
+    std::size_t GetMaterializedCount() const { //TODO: избавиться от метода 
         return static_cast<std::size_t>( cache_->GetLength() );
     }
 
     my_utils::Cardinality GetCardinality() const {
         return generator_->GetCardinality();
     }
+
+    Sequence<T>* Clone() const override {
+        return new LazySequence<T>( *this );
+    }
+
+    // ==== Операции мутации (возвращают новые объекты) ====
 
     LazySequence<T>* GetSubsequence( int startIndex, int endIndex ) const override {
         if ( startIndex < 0 || endIndex < startIndex ) throw std::out_of_range( "IndexOutOfRange" );
@@ -146,39 +152,29 @@ public:
         return new LazySequence<T>( sub_cache );
     }
 
-    Sequence<T>* Clone() const override {
-        return new LazySequence<T>( *this );
-    }
-
-    // ==== Операции мутации (возвращают новые объекты) ====
-
     Sequence<T>* CreateEmpty() const override {
         return new LazySequence<T>();
     }
 
+    // Append() на данный момент написано неправильно
     Sequence<T>* Append( const T& item ) override {
-        MaterializeAll();
+        MaterializeAll(); //TODO: appendGenerator
         Sequence<T>* new_cache = cache_->Append( item );
         return new LazySequence<T>( new_cache );
     }
 
+    // Prepend() пока что написан неправильно
     Sequence<T>* Prepend( const T& item ) override {
         MaterializeAll();
         Sequence<T>* new_cache = cache_->Prepend( item );
         return new LazySequence<T>( new_cache );
     }
 
+    // InsertAt() пока что написан неправильно
     // Вставить эл-нт в заданную позицию 
     LazySequence<T>* InsertAt( const T& item, int index ) override {
         MaterializeAll();
         Sequence<T>* new_cache = cache_->InsertAt( item, index );
-        return new LazySequence<T>( new_cache );
-    }
-
-    // Сцепляет 2 списка
-    LazySequence<T>* Concat( Sequence<T>* other ) const override {
-        MaterializeAll();
-        Sequence<T>* new_cache = cache_->Concat( other );
         return new LazySequence<T>( new_cache );
     }
 
@@ -189,7 +185,7 @@ public:
         IGenerator<T>* concat_gen = new ConcatGenerator<T>( this->generator_, other->generator_ );
 
         LazySequence<T>* result = new LazySequence<T>();
-        delete result->generator_; // удаляем дефолтный генератор
+        delete result->generator_; 
         result->generator_ = concat_gen;
         result->is_exhausted_ = false; 
 
@@ -247,18 +243,18 @@ public:
         return result;
     }
 
-    // template <typename T2>
-    // LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
-    //     MaterializeAll();
-    //     LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
-    //     int min_len = std::min( cache_->GetLength(), seq->GetLength() );
+    template <typename T2>
+    LazySequence<my_utils::Pair<T, T2>>* Zip( Sequence<T2>* seq ) const {
+        MaterializeAll();
+        LazySequence<my_utils::Pair<T, T2>>* result = new LazySequence<my_utils::Pair<T, T2>>();
+        int min_len = std::min( cache_->GetLength(), seq->GetLength() );
 
-    //     for ( int i = 0; i < min_len; ++i ) {
-    //         my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );
-    //         result = static_cast<LazySequence<my_utils::Pair<T, T2>>*>( result->Append( pair ) );
-    //     }
-    //     return result;
-    // }
+        for ( int i = 0; i < min_len; ++i ) {
+            my_utils::Pair<T, T2> pair( cache_->Get( i ), seq->Get( i ) );
+            result = static_cast<LazySequence<my_utils::Pair<T, T2>>*>( result->Append( pair ) );
+        }
+        return result;
+    }
 
 protected:
     // Поля mutable, чтобы их можно было менять внутри const-методов 

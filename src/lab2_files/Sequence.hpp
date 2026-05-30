@@ -49,7 +49,6 @@ public:
     virtual Sequence<T>* InsertAt( const T& item, int index )       = 0;
     virtual Sequence<T>* Concat( Sequence<T>* other)          const = 0;
 
-    // Полиморфное клонирование (добавь эту строку!)
     virtual Sequence<T>* Clone() const = 0;
 
     // Фабричный метод

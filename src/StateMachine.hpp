@@ -26,7 +26,7 @@ public:
     using PredicateFunc = std::function<bool( const T& )>;
 
     // Нужен для массивов
-    Transition() : from_state(""), to_state(""), condition_(nullptr) { }
+    Transition() : from_state(""), to_state(""), condition_( nullptr ) { }
 
     Transition( const std::string& from, const std::string& to, PredicateFunc condition )
         : from_state( from ), to_state( to ), condition_( condition ) { }

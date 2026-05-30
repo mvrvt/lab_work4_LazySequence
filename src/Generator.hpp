@@ -216,3 +216,6 @@ public:
         return my_utils::Cardinality( 0, 0 );
     }
 };
+
+// append and insert generator'ы
+// грубо говоря на каждую операцию нужен свой генератор
