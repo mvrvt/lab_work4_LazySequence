@@ -1,5 +1,7 @@
 #pragma once
 #include <stdexcept>
+#include <fstream>
+#include <string>
 #include "MyUtils.hpp"
 
 template <typename T>
@@ -11,7 +13,7 @@ public:
     virtual IGenerator<T>* Clone() const = 0;
 };
 
-// 1. Базовый генератор (Rule)
+// 1. Базовый генератор на основе правила-функции
 template <typename T>
 class RuleGenerator : public IGenerator<T> {
 public:
@@ -21,7 +23,7 @@ public:
     
     T GetAt(my_utils::Ordinal idx) override {
         if (idx >= cardinality_) throw std::out_of_range("RuleGenerator: index out of range");
-        return rule_(idx.finite); // Базовое правило работает только с конечными индексами
+        return rule_(idx.finite);
     }
 
     IGenerator<T>* Clone() const override { return new RuleGenerator<T>(rule_, cardinality_); }
@@ -32,7 +34,7 @@ private:
     my_utils::Ordinal cardinality_;
 };
 
-// 2. Map Generator
+// 2. Генератор операции Map
 template <typename T, typename T2>
 class MapGenerator : public IGenerator<T2> {
 public:
@@ -50,7 +52,7 @@ private:
     TransformFunc func_;
 };
 
-// 3. Concat Generator (Магия ординалов)
+// 3. Генератор операции Concat (Дерево AST ординалов с доски)
 template <typename T>
 class ConcatGenerator : public IGenerator<T> {
 public:
@@ -77,16 +79,14 @@ private:
     IGenerator<T>* right_;
 };
 
-// 4. Skip Generator
+// 4. Генератор операции Skip
 template <typename T>
 class SkipGenerator : public IGenerator<T> {
 public:
     SkipGenerator(IGenerator<T>* source, int count) : count_(count) { source_ = source->Clone(); }
     ~SkipGenerator() override { delete source_; }
 
-    T GetAt(my_utils::Ordinal idx) override {
-        return source_->GetAt(idx + my_utils::Ordinal(0, count_));
-    }
+    T GetAt(my_utils::Ordinal idx) override { return source_->GetAt(idx + my_utils::Ordinal(0, count_)); }
     IGenerator<T>* Clone() const override { return new SkipGenerator<T>(source_, count_); }
     my_utils::Ordinal GetCardinality() const override { 
         auto card = source_->GetCardinality();
@@ -96,4 +96,63 @@ public:
 private:
     IGenerator<T>* source_;
     int count_;
+};
+
+// =========================================================================
+// ОТВЕТЫ НА ВОПРОСЫ ПРЕПОДАВАТЕЛЯ С ЗАЩИТЫ (Продвинутая гибкость архитектуры)
+// =========================================================================
+
+// Вопрос №1: Чередующееся сцепление (Interleave) бесконечных последовательностей
+template <typename T>
+class InterleaveGenerator : public IGenerator<T> {
+public:
+    InterleaveGenerator(IGenerator<T>** generators, int count) : count_(count) {
+        gens_ = new IGenerator<T>*[count];
+        for (int i = 0; i < count; ++i) gens_[i] = generators[i]->Clone();
+    }
+    ~InterleaveGenerator() override {
+        for (int i = 0; i < count_; ++i) delete gens_[i];
+        delete[] gens_;
+    }
+    T GetAt(my_utils::Ordinal idx) override {
+        // Вычисляем, к какому из генераторов относится текущий общий индекс ординала
+        int gen_index = idx.finite % count_;
+        int internal_finite = idx.finite / count_;
+        return gens_[gen_index]->GetAt(my_utils::Ordinal(idx.omega0, internal_finite));
+    }
+    IGenerator<T>* Clone() const override { return new InterleaveGenerator<T>(gens_, count_); }
+    my_utils::Ordinal GetCardinality() const override { return my_utils::Ordinal(1, 0); }
+private:
+    IGenerator<T>** gens_;
+    int count_;
+};
+
+// Вопрос №2: Потоковый генератор файла, обновляемого на лету (Tail -f)
+template <typename T>
+class FileTailGenerator : public IGenerator<T> {
+public:
+    typedef T (*ParserFunc)(const std::string&);
+
+    FileTailGenerator(const std::string& filename, ParserFunc parser) 
+        : filename_(filename), parser_(parser), current_pos_(0) {}
+
+    T GetAt(my_utils::Ordinal idx) override {
+        std::ifstream file(filename_);
+        file.seekg(current_pos_);
+        std::string value;
+        
+        // Если достигнут EOF (другое приложение еще не записало данные)
+        if (!(file >> value)) {
+            file.clear(); // Сбрасываем флаг ошибки
+            return T();   // Возвращаем пустой/дефолтный объект рантайма, ожидая запись
+        }
+        current_pos_ = file.tellg();
+        return parser_(value);
+    }
+    IGenerator<T>* Clone() const override { return new FileTailGenerator<T>(filename_, parser_); }
+    my_utils::Ordinal GetCardinality() const override { return my_utils::Ordinal(1, 0); }
+private:
+    std::string filename_;
+    ParserFunc parser_;
+    std::streampos current_pos_;
 };

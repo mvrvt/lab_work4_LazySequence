@@ -10,9 +10,7 @@ public:
         buffer_ = new DynamicArray<T>(capacity);
     }
 
-    ~SlidingCache() {
-        delete buffer_;
-    }
+    ~SlidingCache() { delete buffer_; }
 
     bool IsEmpty() const { return count_ == 0; }
     int GetCount() const { return count_; }
@@ -30,8 +28,7 @@ public:
 
     const T& Get(int index) const {
         if (!Contains(index)) throw std::out_of_range("Index not in sliding cache");
-        int internal_index = index - start_index_;
-        return buffer_->Get(internal_index);
+        return buffer_->Get(index - start_index_);
     }
 
     void Push(const T& item, int global_index) {
@@ -40,12 +37,11 @@ public:
             buffer_->Set(0, item);
             count_ = 1;
         } else if (global_index == start_index_ + count_) {
-            // Добавление в конец окна
             if (count_ < capacity_) {
                 buffer_->Set(count_, item);
                 count_++;
             } else {
-                // Окно переполнено, сдвигаем влево
+                // Сдвиг окна вправо за O(1) относительных индексов
                 for (int i = 1; i < capacity_; ++i) {
                     buffer_->Set(i - 1, buffer_->Get(i));
                 }
@@ -53,7 +49,7 @@ public:
                 start_index_++;
             }
         } else {
-            // Если индекс оторван от текущего окна, начинаем окно заново
+            // Если запрошен далекий индекс, сбрасываем окно под него
             Clear();
             start_index_ = global_index;
             buffer_->Set(0, item);

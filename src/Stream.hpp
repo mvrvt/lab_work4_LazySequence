@@ -1,158 +1,183 @@
 #pragma once
-
 #include <stdexcept>
 #include <string>
 #include <cstddef>
+#include <fstream>
+#include <sstream>
 #include "lab2_files/Sequence.hpp"
 #include "LazySequence.hpp"
 
-// Исключение, которое выбрасывается при попытке чтения за пределами потока
 class EndOfStream : public std::runtime_error {
 public:
-    explicit EndOfStream( const std::string& message ) : std::runtime_error( message ) { }
+    explicit EndOfStream(const std::string& message) : std::runtime_error(message) {}
 };
-
-// Поток для ЧТЕНИЯ
 
 template <typename T>
 class ReadOnlyStream {
 public:
-    // Тип для ф-ии десериализации
-    typedef T ( *DeserializerFunc )( const std::string& );
+    typedef T (*DeserializerFunc)(const std::string&);
+    enum StreamType { SEQ, FILE_STREAM, STRING_STREAM };
 
-    // Конструктор из Sequence (работает и для LazySequence, т.к. это наследник)
-    explicit ReadOnlyStream( const Sequence<T>* sequence )
-        : source_sequence_( sequence ), current_position_( 0 ), is_open_( false ) { }
-    
-    // Конструктор копирования из другого потока
-    explicit ReadOnlyStream( const ReadOnlyStream<T>& other )
-        : source_sequence_( other.source_sequence_ ),
-          current_position_( other.current_position_ ),
-          is_open_( other.is_open_ ) { }
+    explicit ReadOnlyStream(const Sequence<T>* sequence)
+        : stream_type_(SEQ), source_sequence_(sequence), current_position_(0), is_open_(false), 
+          deserializer_(nullptr), file_stream_(nullptr), string_stream_(nullptr) {}
 
-    // ---- Операции открытия/закрытия ----
+    ReadOnlyStream(const std::string& source, DeserializerFunc deserializer, bool is_file)
+        : source_sequence_(nullptr), current_position_(0), is_open_(false), 
+          deserializer_(deserializer), file_stream_(nullptr), string_stream_(nullptr) {
+        if (is_file) {
+            stream_type_ = FILE_STREAM;
+            filename_ = source;
+        } else {
+            stream_type_ = STRING_STREAM;
+            raw_string_data_ = source;
+        }
+    }
+
+    ~ReadOnlyStream() { Close(); }
+
     void Open() {
-        if ( !source_sequence_ ) 
-            throw std::logic_error( "ReadOnlyStream: no data source attached" );
+        if (stream_type_ == FILE_STREAM) {
+            file_stream_ = new std::ifstream(filename_);
+            if (!file_stream_->is_open()) throw std::logic_error("ReadOnlyStream: cannot open file");
+        } else if (stream_type_ == STRING_STREAM) {
+            string_stream_ = new std::istringstream(raw_string_data_);
+        }
         is_open_ = true; 
-        current_position_ = 0; // Сбрасываем при открытии 
+        current_position_ = 0;
     }
 
     void Close() {
+        if (file_stream_) { file_stream_->close(); delete file_stream_; file_stream_ = nullptr; }
+        if (string_stream_) { delete string_stream_; string_stream_ = nullptr; }
         is_open_ = false;
     }
 
-    // ==== Декомпозиция ====
-
     bool IsEndOfStream() const {
-        if ( !is_open_ ) throw std::logic_error( "ReadOnlyStream: stream is closed" );
-        
-        // Проверка на то ленивая ли пос-ть
-        const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>( source_sequence_ );
-        
-        // Если это ленивая последовательность и она бесконечна - конец никогда не наступит
-        if ( lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite() ) {
-            return false; 
-        }
-
-        return current_position_ >= static_cast<size_t>( source_sequence_->GetLength() );
+        if (!is_open_) throw std::logic_error("ReadOnlyStream: stream is closed");
+        if (stream_type_ == SEQ) {
+            const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>(source_sequence_);
+            if (lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite()) return false; 
+            return current_position_ >= static_cast<size_t>(source_sequence_->GetLength());
+        } else if (stream_type_ == FILE_STREAM) return file_stream_->eof();
+        else return string_stream_->eof();
     }
 
-    // Чтение текущего элемента со сдвигом
     T Read() {
-        if ( !is_open_ ) throw std::logic_error( "ReadOnlyStream: stream is closed" );
-        if ( IsEndOfStream() ) throw EndOfStream( "ReadOnlyStream: reached the end of the stream" );
+        if (!is_open_) throw std::logic_error("ReadOnlyStream: stream is closed");
+        if (IsEndOfStream()) throw EndOfStream("ReadOnlyStream: reached the end");
 
-        T item = source_sequence_->Get( current_position_ );
+        T item;
+        if (stream_type_ == SEQ) {
+            item = source_sequence_->Get(current_position_);
+        } else {
+            std::string token;
+            if (stream_type_ == FILE_STREAM) *file_stream_ >> token;
+            else *string_stream_ >> token;
+            if (token.empty() && IsEndOfStream()) throw EndOfStream("Stream ended");
+            item = deserializer_(token);
+        }
         current_position_++;
         return item;
     }
 
-    std::size_t GetPosition() const {
-        return current_position_;
-    }
+    std::size_t GetPosition() const { return current_position_; }
+    bool CanSeek() const { return stream_type_ == SEQ; } 
+    bool CanGoBack() const { return stream_type_ == SEQ; }
 
-    // Возможно ли перемещение вдоль потока (для Sequence - да)
-    bool CanSeek() const {
-        return true;
-    }
+    std::size_t Seek(std::size_t index) {
+        if (!is_open_) throw std::logic_error("ReadOnlyStream: stream is closed");
+        if (!CanSeek()) throw std::logic_error("ReadOnlyStream: stream doesn't support seek");
 
-    // Перемещение на заданную позицию (аналог Skip)
-    std::size_t Seek( std::size_t index ) {
-        if ( !is_open_ ) throw std::logic_error( "ReadOnlyStream: stream is closed" );
-        if ( !CanSeek() ) throw std::logic_error( "ReadOnlyStream: stream doesn't support seek" );
-
-        // Проверяем, является ли последовательность бесконечной ленивой
         bool is_infinite = false;
-        const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>( source_sequence_ );
-        
-        // ИСПРАВЛЕНИЕ: Используем правильное имя метода GetOrdinalCardinality()
-        if ( lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite() ) {
-            is_infinite = true;
-        }
+        const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>(source_sequence_);
+        if (lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite()) is_infinite = true;
 
-        // Вызываем GetLength() ТОЛЬКО если последовательность конечная
-        if ( !is_infinite && index > static_cast<size_t>( source_sequence_->GetLength() ) ) {
-            throw std::out_of_range( "ReadOnlyStream: seek index out of bounds" );
+        if (!is_infinite && index > static_cast<size_t>(source_sequence_->GetLength())) {
+            throw std::out_of_range("ReadOnlyStream: seek index out of bounds");
         }
-        
         current_position_ = index;
         return current_position_;
     }
 
-    // Возможно ли вернуться назад (для Sequence - да)
-    bool CanGoBack() const { return true; }
-
 private:
+    StreamType stream_type_;
     const Sequence<T>* source_sequence_;
-    std::size_t        current_position_;
-    bool               is_open_;
+    DeserializerFunc deserializer_;
+    std::string filename_;
+    std::string raw_string_data_;
+    std::ifstream* file_stream_;
+    std::istringstream* string_stream_;
+    std::size_t current_position_;
+    bool is_open_;
 };
-
-// Поток только для ЗАПИСИ
 
 template <typename T>
 class WriteOnlyStream {
 public:
-    // Тип для функции сериализации
-    typedef std::string ( *SerializerFunc )( const T& );
+    typedef std::string (*SerializerFunc)(const T&);
+    enum StreamType { SEQ, FILE_STREAM, STRING_STREAM };
 
-    // Конструктор для записи в Sequence (нужен изменяемый интерфейс)
-    explicit WriteOnlyStream( Sequence<T>* sequence ) : destination_sequence_( sequence ), current_position_( 0 ), is_open_( false ) {
-        if ( destination_sequence_ )
-            current_position_ = static_cast<size_t>( destination_sequence_->GetLength() );
+    explicit WriteOnlyStream(Sequence<T>* sequence)
+        : stream_type_(SEQ), destination_sequence_(sequence), current_position_(0), is_open_(false), 
+          serializer_(nullptr), file_stream_(nullptr), string_stream_(nullptr) {
+        if (destination_sequence_) current_position_ = static_cast<size_t>(destination_sequence_->GetLength());
     }
 
+    WriteOnlyStream(const std::string& source, SerializerFunc serializer, bool is_file)
+        : destination_sequence_(nullptr), current_position_(0), is_open_(false), 
+          serializer_(serializer), file_stream_(nullptr), string_stream_(nullptr) {
+        if (is_file) { stream_type_ = FILE_STREAM; filename_ = source; }
+        else stream_type_ = STRING_STREAM;
+    }
+
+    ~WriteOnlyStream() { Close(); }
+
     void Open() {
-        if ( !destination_sequence_ ) 
-            throw std::logic_error( "WriteOnlyStream: no data destination attached" );
+        if (stream_type_ == FILE_STREAM) {
+            file_stream_ = new std::ofstream(filename_);
+            if (!file_stream_->is_open()) throw std::logic_error("WriteOnlyStream: cannot open file");
+        } else if (stream_type_ == STRING_STREAM) {
+            string_stream_ = new std::ostringstream();
+        }
         is_open_ = true; 
     }
 
     void Close() {
+        if (file_stream_) { file_stream_->close(); delete file_stream_; file_stream_ = nullptr; }
+        if (string_stream_) { raw_string_data_ = string_stream_->str(); delete string_stream_; string_stream_ = nullptr; }
         is_open_ = false;
     }
 
-    std::size_t GetPosition() const {
-        return current_position_;
-    }
+    std::size_t GetPosition() const { return current_position_; }
 
-    // Запись элемента в конец потока
-    std::size_t Write( const T& item ) {
-        if ( !is_open_ ) throw std::logic_error( "WriteOnlyStream: stream is closed" );
-
-        // Append() возвращает Sequence<T>*. Если Sequence immutable - вернётся новый объект
-        Sequence<T>* new_seq = destination_sequence_->Append( item );
-        if ( new_seq != destination_sequence_ ) {
-            destination_sequence_ = new_seq; 
+    std::size_t Write(const T& item) {
+        if (!is_open_) throw std::logic_error("WriteOnlyStream: stream is closed");
+        if (stream_type_ == SEQ) {
+            Sequence<T>* new_seq = destination_sequence_->Append(item);
+            if (new_seq != destination_sequence_) destination_sequence_ = new_seq; 
+        } else if (stream_type_ == FILE_STREAM) {
+            *file_stream_ << serializer_(item) << " ";
+        } else {
+            *string_stream_ << serializer_(item) << " ";
         }
-
         current_position_++;
         return current_position_;
     }
 
+    std::string GetString() const {
+        if (stream_type_ != STRING_STREAM) throw std::logic_error("Not a string stream");
+        return raw_string_data_;
+    }
+
 private:
+    StreamType stream_type_;
     Sequence<T>* destination_sequence_;
-    std::size_t  current_position_;
-    bool         is_open_;
+    SerializerFunc serializer_;
+    std::string filename_;
+    mutable std::string raw_string_data_; 
+    std::ofstream* file_stream_;
+    std::ostringstream* string_stream_;
+    std::size_t current_position_;
+    bool is_open_;
 };
