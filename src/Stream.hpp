@@ -51,7 +51,7 @@ public:
         const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>( source_sequence_ );
         
         // Если это ленивая последовательность и она бесконечна - конец никогда не наступит
-        if ( lazy_seq != nullptr && lazy_seq->GetCardinality().IsInfinite() ) {
+        if ( lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite() ) {
             return false; 
         }
 
@@ -82,8 +82,19 @@ public:
         if ( !is_open_ ) throw std::logic_error( "ReadOnlyStream: stream is closed" );
         if ( !CanSeek() ) throw std::logic_error( "ReadOnlyStream: stream doesn't support seek" );
 
-        if ( index > static_cast<size_t>( source_sequence_->GetLength() ) ) 
+        // Проверяем, является ли последовательность бесконечной ленивой
+        bool is_infinite = false;
+        const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>( source_sequence_ );
+        
+        // ИСПРАВЛЕНИЕ: Используем правильное имя метода GetOrdinalCardinality()
+        if ( lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite() ) {
+            is_infinite = true;
+        }
+
+        // Вызываем GetLength() ТОЛЬКО если последовательность конечная
+        if ( !is_infinite && index > static_cast<size_t>( source_sequence_->GetLength() ) ) {
             throw std::out_of_range( "ReadOnlyStream: seek index out of bounds" );
+        }
         
         current_position_ = index;
         return current_position_;

@@ -19,11 +19,13 @@ struct State {
     State( const std::string& state_id, bool final_state = false ) : id( state_id ), is_final( final_state ) { }
 };
 
+
+
 // Класс перехода между состояниями
 template <typename T>
 class Transition {
 public:
-    using PredicateFunc = std::function<bool( const T& )>;
+    typedef bool (*PredicateFunc)(const T&);
 
     // Нужен для массивов
     Transition() : from_state(""), to_state(""), condition_( nullptr ) { }
@@ -69,7 +71,7 @@ public:
     }
 
     // Добавление правила перехода
-    void AddTransition( const std::string& from, const std::string& to, std::function<bool( const T&)> condition ) {
+    void AddTransition( const std::string& from, const std::string& to, typename Transition<T>::PredicateFunc condition ) {
         if ( FindState( from ) == -1 || FindState( to ) == -1 )
             throw std::invalid_argument( "StateMachine: invalid from/to state" );
         transitions_.Append( Transition<T>( from, to, condition ) );
