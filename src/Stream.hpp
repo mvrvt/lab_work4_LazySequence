@@ -37,7 +37,10 @@ public:
     ~ReadOnlyStream() { Close(); }
 
     void Open() {
-        if (stream_type_ == FILE_STREAM) {
+        // Вернули проверку на nullptr для последовательностей
+        if (stream_type_ == SEQ && !source_sequence_) {
+            throw std::logic_error("ReadOnlyStream: no data source attached");
+        } else if (stream_type_ == FILE_STREAM) {
             file_stream_ = new std::ifstream(filename_);
             if (!file_stream_->is_open()) throw std::logic_error("ReadOnlyStream: cannot open file");
         } else if (stream_type_ == STRING_STREAM) {
@@ -59,8 +62,13 @@ public:
             const LazySequence<T>* lazy_seq = dynamic_cast<const LazySequence<T>*>(source_sequence_);
             if (lazy_seq != nullptr && lazy_seq->GetOrdinalCardinality().IsInfinite()) return false; 
             return current_position_ >= static_cast<size_t>(source_sequence_->GetLength());
-        } else if (stream_type_ == FILE_STREAM) return file_stream_->eof();
-        else return string_stream_->eof();
+        } else if (stream_type_ == FILE_STREAM) {
+            // ИСПРАВЛЕНО: Добавлен peek() для мгновенного детектирования пустых файлов
+            return file_stream_->eof() || file_stream_->peek() == EOF;
+        } else {
+            // ИСПРАВЛЕНО: Добавлен peek() для мгновенного детектирования пустых строк
+            return string_stream_->eof() || string_stream_->peek() == EOF;
+        }
     }
 
     T Read() {
@@ -134,7 +142,9 @@ public:
     ~WriteOnlyStream() { Close(); }
 
     void Open() {
-        if (stream_type_ == FILE_STREAM) {
+        if (stream_type_ == SEQ && !destination_sequence_) {
+            throw std::logic_error("WriteOnlyStream: no data destination attached");
+        } else if (stream_type_ == FILE_STREAM) {
             file_stream_ = new std::ofstream(filename_);
             if (!file_stream_->is_open()) throw std::logic_error("WriteOnlyStream: cannot open file");
         } else if (stream_type_ == STRING_STREAM) {
