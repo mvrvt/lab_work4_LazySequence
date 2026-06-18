@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include "../src/SlidingCache.hpp"
 
-// === БАЗОВАЯ ЛОГИКА ===
+// === Базовая логика ===
 TEST(SlidingCacheTest, DefaultConstruction) {
     SlidingCache<int> cache(5);
     EXPECT_TRUE(cache.IsEmpty());
@@ -34,13 +34,13 @@ TEST(SlidingCacheTest, PushMultipleElementsNoOverflow) {
     EXPECT_EQ(cache.Get(2), 30);
 }
 
-// === ЛОГИКА СДВИГА И СБРОСА ===
+// === Логика сдвига и сброса  ===
 TEST(SlidingCacheTest, CacheOverflowShiftsWindow) {
     SlidingCache<int> cache(3);
     cache.Push(10, 0);
     cache.Push(20, 1);
     cache.Push(30, 2);
-    cache.Push(40, 3); // Выталкивает 0-й индекс
+    cache.Push(40, 3); 
     
     EXPECT_EQ(cache.GetCount(), 3);
     EXPECT_FALSE(cache.Contains(0));
@@ -89,7 +89,7 @@ TEST(SlidingCacheTest, ClearCache) {
     EXPECT_EQ(cache.GetCount(), 0);
 }
 
-// === ПРОВЕРКА ИСКЛЮЧЕНИЙ ===
+// === Проверка исключений ===
 TEST(SlidingCacheTest, GetMissingElementThrows) {
     SlidingCache<int> cache(3);
     cache.Push(10, 0);
@@ -100,7 +100,7 @@ TEST(SlidingCacheTest, GetElementBeforeWindowThrows) {
     SlidingCache<int> cache(2);
     cache.Push(1, 0);
     cache.Push(2, 1);
-    cache.Push(3, 2); // 0 вытолкнут
+    cache.Push(3, 2); 
     EXPECT_THROW(cache.Get(0), std::out_of_range);
 }
 

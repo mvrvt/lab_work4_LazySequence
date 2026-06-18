@@ -5,13 +5,13 @@
 
 using namespace my_utils;
 
-// === ФУНКЦИИ ДЛЯ ГЕНЕРАТОРОВ (БЕЗ ЛЯМБД) ===
+// === Функции генераторов ===
 int BaseRule(int idx) { return idx + 1; }
 int MultRule(const int& x) { return x * 10; }
 int Seq2Rule(int idx) { return 100 + idx; }
 int ThrowRule(int idx) { throw std::runtime_error("Error"); }
 
-// === ТЕСТЫ БАЗОВОГО ДОСТУПА ===
+// === Тесты базового доступа ===
 TEST(LazySequenceTest, FiniteSequenceLength) {
     LazySequence<int> seq(BaseRule, Ordinal(0, 5));
     EXPECT_EQ(seq.GetLength(), 5);
@@ -35,7 +35,7 @@ TEST(LazySequenceTest, GetOutOfBoundsFiniteThrows) {
     EXPECT_THROW(seq.Get(5), std::out_of_range);
 }
 
-// === ТЕСТЫ ОПЕРАЦИИ MAP ===
+// === Тесты Map() ===
 TEST(LazySequenceTest, MapFiniteSequence) {
     LazySequence<int> seq(BaseRule, Ordinal(0, 3));
     auto* mapped = seq.Map<int>(MultRule);
@@ -52,7 +52,7 @@ TEST(LazySequenceTest, MapInfiniteSequence) {
     delete mapped;
 }
 
-// === ТЕСТЫ ОПЕРАЦИИ SKIP ===
+// === Тесты Skip() ===
 TEST(LazySequenceTest, SkipFiniteSequence) {
     LazySequence<int> seq(BaseRule, Ordinal(0, 10));
     auto* skipped = seq.Skip(5);
@@ -77,7 +77,7 @@ TEST(LazySequenceTest, SkipMoreThanFiniteLength) {
     delete skipped;
 }
 
-// === ТЕСТЫ КОНКАТЕНАЦИИ ===
+// === Тесты конкатенации ===
 TEST(LazySequenceTest, ConcatFiniteAndFinite) {
     LazySequence<int> s1(BaseRule, Ordinal(0, 3));
     LazySequence<int> s2(Seq2Rule, Ordinal(0, 2));
@@ -121,7 +121,7 @@ TEST(LazySequenceTest, ConcatInfiniteAndInfinite) {
     delete concat;
 }
 
-// === ИНТЕРЛИВ ГЕНЕРАТОР (БОНУС С ДОСКИ) ===
+// === Interleave генератор ===
 TEST(LazySequenceTest, InterleaveGenerators) {
     IGenerator<int>* gen1 = new RuleGenerator<int>(BaseRule, Ordinal(1, 0));
     IGenerator<int>* gen2 = new RuleGenerator<int>(Seq2Rule, Ordinal(1, 0));
@@ -129,7 +129,7 @@ TEST(LazySequenceTest, InterleaveGenerators) {
     
     InterleaveGenerator<int> interleave(arr, 2);
     
-    // Чередование: gen1(0), gen2(0), gen1(1), gen2(1)...
+    // Чередование: gen1(0), gen2(0), gen1(1), gen2(1) и т.д.
     EXPECT_EQ(interleave.GetAt(Ordinal(0, 0)), 1);
     EXPECT_EQ(interleave.GetAt(Ordinal(0, 1)), 100);
     EXPECT_EQ(interleave.GetAt(Ordinal(0, 2)), 2);
@@ -139,7 +139,7 @@ TEST(LazySequenceTest, InterleaveGenerators) {
     delete gen2;
 }
 
-// === ИСКЛЮЧЕНИЯ ПРИ ГЕНЕРАЦИИ ===
+// === Исключение при генерации ===
 TEST(LazySequenceTest, PropagatesGeneratorExceptions) {
     LazySequence<int> seq(ThrowRule, Ordinal(0, 5));
     EXPECT_THROW(seq.Get(0), std::runtime_error);

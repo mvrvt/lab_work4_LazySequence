@@ -4,11 +4,11 @@
 #include <stdexcept>
 #include "../src/Stream.hpp"
 
-// === ФУНКЦИИ СЕРИАЛИЗАЦИИ ===
+// === Функции сериализации ===
 int ParseIntValid(const std::string& s) { return std::stoi(s); }
 std::string StringifyIntValid(const int& v) { return std::to_string(v); }
 
-// === ТЕСТЫ STRING STREAM (ЧТЕНИЕ) ===
+// === Тесты string stream (ЧТЕНИЕ) ===
 TEST(StringStreamTest, ReadStringTokens) {
     ReadOnlyStream<int> stream("10 20 30", ParseIntValid, false);
     stream.Open();
@@ -39,13 +39,13 @@ TEST(StringStreamTest, EmptyStringStreamIsEOFImmediately) {
     EXPECT_THROW(stream.Read(), EndOfStream);
 }
 
-// === ТЕСТЫ STRING STREAM (ЗАПИСЬ) ===
+// === Тесты string stream (ЗАПИСЬ) ===
 TEST(StringStreamTest, WriteStringTokens) {
     WriteOnlyStream<int> stream("", StringifyIntValid, false);
     stream.Open();
     stream.Write(10);
     stream.Write(20);
-    stream.Close(); // Close флашит буфер
+    stream.Close(); 
     EXPECT_EQ(stream.GetString(), "10 20 ");
 }
 
@@ -59,7 +59,7 @@ TEST(StringStreamTest, GetStringOnFileStreamThrows) {
     EXPECT_THROW(stream.GetString(), std::logic_error);
 }
 
-// === ТЕСТЫ FILE STREAM (ЧТЕНИЕ) ===
+// === Тесты file stream (ЧТЕНИЕ) ===
 TEST(FileStreamTest, OpenNonExistentFileThrows) {
     ReadOnlyStream<int> stream("non_existent_file_12345.txt", ParseIntValid, true);
     EXPECT_THROW(stream.Open(), std::logic_error);
@@ -95,7 +95,7 @@ TEST(FileStreamTest, FileStreamCannotSeek) {
     std::remove(filename.c_str());
 }
 
-// === ТЕСТЫ FILE STREAM (ЗАПИСЬ) ===
+// === Тесты file stream (ЗАПИСЬ) ===
 TEST(FileStreamTest, WriteFileTokens) {
     const std::string filename = "gtest_write_test.txt";
     WriteOnlyStream<int> stream(filename, StringifyIntValid, true);
@@ -146,7 +146,7 @@ TEST(FileStreamTest, OpenAndCloseMultipleTimes) {
     std::ifstream in(filename);
     int a;
     in >> a;
-    EXPECT_EQ(a, 2); // Старая '1' должна быть стерта
+    EXPECT_EQ(a, 2);
     in.close();
     
     std::remove(filename.c_str());

@@ -7,22 +7,22 @@ template <typename T1, typename T2>
 struct Pair {
     T1 first;
     T2 second;
-    Pair() : first(T1()), second(T2()) {}
-    Pair(const T1& f, const T2& s) : first(f), second(s) {}  
+    Pair() : first( T1() ), second( T2() ) { }
+    Pair( const T1& f, const T2& s ) : first( f ), second( s ) { }  
 };
 
 template <typename T>
 class Optional {
 public:
-    Optional() : has_value_(false) {}
-    explicit Optional(const T& val) : value_(val), has_value_(true) {}
+    Optional() : has_value_( false ) { }
+    explicit Optional( const T& val ) : value_( val ), has_value_( true ) { }
     bool HasValue() const { return has_value_; }
     const T& Value() const {
-        if (!has_value_) throw std::runtime_error("Optional object contains no value");
+        if ( !has_value_ ) throw std::runtime_error("Optional object contains no value");
         return value_;
     }
 private:
-    T value_;
+    T    value_;
     bool has_value_;
 };
 
@@ -31,31 +31,31 @@ struct Ordinal {
     int omega0; // Множитель перед бесконечностью
     int finite; // Конечный остаток
 
-    Ordinal(int w = 0, int f = 0) : omega0(w), finite(f) {}
+    Ordinal( int w = 0, int f = 0 ) : omega0( w ), finite( f ) {}
 
     bool IsInfinite() const { return omega0 > 0; }
 
-    bool operator<(const Ordinal& other) const {
-        if (omega0 != other.omega0) return omega0 < other.omega0;
+    bool operator<( const Ordinal& other ) const {
+        if ( omega0 != other.omega0 ) return omega0 < other.omega0;
         return finite < other.finite;
     }
-    bool operator>=(const Ordinal& other) const { return !(*this < other); }
-    bool operator==(const Ordinal& other) const { return omega0 == other.omega0 && finite == other.finite; }
+    bool operator>=( const Ordinal& other ) const { return !(*this < other); }
+    bool operator==( const Ordinal& other ) const { return omega0 == other.omega0 && finite == other.finite; }
 
     // Сложение ординалов: конечная часть поглощается следующей бесконечностью
-    Ordinal operator+(const Ordinal& other) const {
-        if (other.omega0 > 0) {
-            return Ordinal(omega0 + other.omega0, other.finite);
+    Ordinal operator+( const Ordinal& other ) const {
+        if ( other.omega0 > 0 ) {
+            return Ordinal( omega0 + other.omega0, other.finite );
         }
-        return Ordinal(omega0, finite + other.finite);
+        return Ordinal( omega0, finite + other.finite );
     }
 
     // Вычитание ординалов для вычисления относительных индексов в AST-дереве
-    Ordinal operator-(const Ordinal& other) const {
-        if (omega0 == other.omega0) {
-            return Ordinal(0, finite - other.finite);
+    Ordinal operator-( const Ordinal& other ) const {
+        if ( omega0 == other.omega0 ) {
+            return Ordinal( 0, finite - other.finite );
         }
-        return Ordinal(omega0 - other.omega0, finite);
+        return Ordinal( omega0 - other.omega0, finite );
     }
 };
 

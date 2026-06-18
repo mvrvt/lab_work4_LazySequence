@@ -3,7 +3,7 @@
 
 using namespace my_utils;
 
-// === ТЕСТЫ КОНСТРУКТОРОВ ===
+// === Тесты конструкторов ===
 TEST(OrdinalTest, DefaultConstructor) {
     Ordinal c;
     EXPECT_EQ(c.omega0, 0);
@@ -25,7 +25,7 @@ TEST(OrdinalTest, InfiniteConstructor) {
     EXPECT_TRUE(c.IsInfinite());
 }
 
-// === ТЕСТЫ ОПЕРАТОРОВ СРАВНЕНИЯ ===
+// === Тесты операторов сравнения===
 TEST(OrdinalTest, EqualityFinite) {
     EXPECT_TRUE(Ordinal(0, 5) == Ordinal(0, 5));
     EXPECT_FALSE(Ordinal(0, 5) == Ordinal(0, 6));
@@ -53,7 +53,7 @@ TEST(OrdinalTest, GreaterOrEqual) {
     EXPECT_FALSE(Ordinal(1, 5) >= Ordinal(1, 6));
 }
 
-// === ТЕСТЫ СЛОЖЕНИЯ ===
+// === Тесты сложения ===
 TEST(OrdinalTest, AddFiniteToFinite) {
     Ordinal res = Ordinal(0, 10) + Ordinal(0, 5);
     EXPECT_EQ(res.omega0, 0);
@@ -78,7 +78,7 @@ TEST(OrdinalTest, AddInfiniteToInfinite) {
     EXPECT_EQ(res.finite, 5);
 }
 
-// === ТЕСТЫ ВЫЧИТАНИЯ ===
+// === Тесты вычитания ===
 TEST(OrdinalTest, SubtractFinite) {
     Ordinal res = Ordinal(0, 10) - Ordinal(0, 3);
     EXPECT_EQ(res.omega0, 0);

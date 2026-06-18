@@ -8,7 +8,7 @@ using namespace my_utils;
 
 int StreamNumRule(int idx) { return idx + 1; }
 
-// === ТЕСТЫ READ-ONLY STREAM ===
+// === Тесты ReadOnlyStream ===
 TEST(ReadOnlyStreamTest, OpenCloseState) {
     LazySequence<int> seq(StreamNumRule, Ordinal(0, 5));
     ReadOnlyStream<int> stream(&seq);
@@ -83,7 +83,7 @@ TEST(ReadOnlyStreamTest, CanSeekAndCanGoBack) {
     EXPECT_TRUE(stream.CanGoBack());
 }
 
-// === ТЕСТЫ WRITE-ONLY STREAM ===
+// === Тесты WriteOnlyStream ===
 TEST(WriteOnlyStreamTest, WriteAppendsToSequence) {
     MutableArraySequence<int> seq;
     WriteOnlyStream<int> stream(&seq);
